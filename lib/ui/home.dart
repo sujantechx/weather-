@@ -1,14 +1,15 @@
 
-// lib/ui/home.dart
+import 'dart:ui' as ui;
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'dart:ui' as ui;
 
-import '../data/models/wwather_model.dart';
+import '../data/remote_data/models/wwather_model.dart';
 import '../logic/weather_cubit.dart';
 import '../logic/weather_state.dart';
-import 'detelsh_screen.dart'; // Ensure you have this file for navigation
+import 'detelsh_screen.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -22,10 +23,26 @@ class HomePage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (state is WeatherError) {
-            return Center(child: Text("Error: ${state.message}"));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text("Error: ${state.message}"),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () {
+                      // Allow retrying if the initial fetch failed
+                      context.read<WeatherCubit>().refreshWeather();
+                    },
+                    child: const Text('Try Again'),
+                  )
+                ],
+              ),
+            );
           }
           if (state is WeatherLoaded) {
             final weather = state.weather;
+            // The buildWeatherUI function is now wrapped in a RefreshIndicator
             return buildWeatherUI(context, weather);
           }
           return const SizedBox.shrink();
@@ -35,37 +52,43 @@ class HomePage extends StatelessWidget {
   }
 
   Widget buildWeatherUI(BuildContext context, WeatherData weather) {
-    return CustomScrollView(
-      slivers: [
-        const SliverAppBar(
-          backgroundColor: Color(0xFF212832),
-          pinned: true,
-          title: Text(
-            'Bhubaneswar, Odisha',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+    return RefreshIndicator(
+      onRefresh: () => context.read<WeatherCubit>().refreshWeather(),
+      child: CustomScrollView(
+        slivers: [
+          const SliverAppBar(
+            backgroundColor: Color(0xFF212832),
+            pinned: true,
+            title: Text(
+              'Angul, Odisha',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
           ),
-        ),
-        SliverToBoxAdapter(child: CurrentWeatherSection(current: weather.current)),
-        const SliverToBoxAdapter(child: SizedBox(height: 20)),
-        SliverToBoxAdapter(child: HourlyForecastSection(hourly: weather.hourly)),
-        const SliverToBoxAdapter(child: SizedBox(height: 20)),
-        DailyForecastSection(daily: weather.daily),
-        const SliverToBoxAdapter(child: SizedBox(height: 20)),
-        const SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text('Current conditions', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          SliverToBoxAdapter(child: CurrentWeatherSection(current: weather.current)),
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+          SliverToBoxAdapter(child: HourlyForecastSection(hourly: weather.hourly)),
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+          DailyForecastSection(weatherData: weather),
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text('Current conditions', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
           ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 10)),
-        CurrentConditionsGrid(current: weather.current),
-        const SliverToBoxAdapter(child: SizedBox(height: 20)),
-        SunriseSunsetSection(current: weather.current),
-        const SliverToBoxAdapter(child: SizedBox(height: 20)),
-      ],
+          const SliverToBoxAdapter(child: SizedBox(height: 10)),
+          CurrentConditionsGrid(current: weather.current),
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+          // --- FIX IS HERE ---
+          // The SunriseSunsetSection (a box widget) is wrapped in a SliverToBoxAdapter.
+          SliverToBoxAdapter(child: SunriseSunsetSection(current: weather.current)),
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+        ],
+      ),
     );
-  }
-}
+  }}
+
+// ... (All other widgets in this file like CurrentWeatherSection, etc., remain exactly the same)
 
 // Helper function to map weather conditions to icons
 IconData getWeatherIcon(String mainCondition) {
@@ -168,12 +191,17 @@ class HourlyForecastSection extends StatelessWidget {
   }
 }
 
+// ... inside your home.dart file
+
 class DailyForecastSection extends StatelessWidget {
-  final List<DailyForecast> daily;
-  const DailyForecastSection({super.key, required this.daily});
+  final WeatherData weatherData; // Add this to receive the full weather data
+  const DailyForecastSection({super.key, required this.weatherData});
 
   @override
   Widget build(BuildContext context) {
+    // The list now uses the real data from weatherData.daily
+    final daily = weatherData.daily;
+
     return SliverList(
       delegate: SliverChildBuilderDelegate(
             (context, index) {
@@ -182,8 +210,18 @@ class DailyForecastSection extends StatelessWidget {
           String dayString = index == 0 ? 'Today' : DateFormat('EEEE').format(date);
 
           return GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const DetailsPage())),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DetailsPage(
+                  // Pass the full weather data and the selected index
+                  weatherData: weatherData,
+                  initialIndex: index,
+                ),
+              ),
+            ),
             child: Padding(
+              // ... the rest of your Row UI remains the same
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -214,6 +252,8 @@ class DailyForecastSection extends StatelessWidget {
   }
 }
 
+// In your HomePage's buildWeatherUI method, update the DailyForecastSection call:
+// DailyForecastSection(daily: weather.daily) -> DailyForecastSection(weatherData: weather)
 class CurrentConditionsGrid extends StatelessWidget {
   final CurrentWeather current;
   const CurrentConditionsGrid({super.key, required this.current});

@@ -2,10 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:weather/data/remote_data/repositores/weather_repository.dart';
+import 'package:weather/data/remote_data/services/api_service.dart';
 import 'package:weather/ui/home.dart';
-import 'data/repositores/weather_repository.dart';
-import 'data/services/api_service.dart';
-import 'data/services/location_service.dart';
+
+import 'data/remote_data/services/location_service.dart';
 import 'logic/weather_cubit.dart';
 
 // Make the main function async to await for location
@@ -14,7 +15,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final locationService = LocationService();
-  final weatherRepository = WeatherRepository(apiService: ApiService());
+  final weatherRepository = WeatherRepository(apiHelper: ApiHelper());
   final weatherCubit = WeatherCubit(repository: weatherRepository);
 
   try {

@@ -1,26 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../data/remote_data/models/wwather_model.dart';
+import '../ui/home.dart'; // For the getWeatherIcon function
+
+// Enum to manage the state of the details chart
+enum DetailChartType { precipitation, wind, humidity }
 
 class DetailsPage extends StatefulWidget {
-  const DetailsPage({super.key});
+  // Accept the full weather data and the initially selected index
+  final WeatherData weatherData;
+  final int initialIndex;
+
+  const DetailsPage({
+    super.key,
+    required this.weatherData,
+    required this.initialIndex,
+  });
 
   @override
   State<DetailsPage> createState() => _DetailsPageState();
 }
 
 class _DetailsPageState extends State<DetailsPage> {
-  int _selectedDayIndex = 0; // 'Today' is selected by default
+  late int _selectedDayIndex;
+  DetailChartType _selectedDetail = DetailChartType.precipitation;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize the selected day with the index passed from the home page
+    _selectedDayIndex = widget.initialIndex;
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Get the data for the currently selected day
+    final selectedDay = widget.weatherData.daily[_selectedDayIndex];
+
+    // Filter the hourly forecast to only show hours for the selected day
+    final hourlyForSelectedDay = widget.weatherData.hourly.where((h) {
+      final hDate = DateTime.fromMillisecondsSinceEpoch(h.dt * 1000);
+      final sDate = DateTime.fromMillisecondsSinceEpoch(selectedDay.dt * 1000);
+      return hDate.day == sDate.day;
+    }).toList();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('10-day forecast'),
+        title: const Text('Forecast Details'),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -28,19 +60,19 @@ class _DetailsPageState extends State<DetailsPage> {
           children: [
             _buildDaySelector(),
             const SizedBox(height: 24),
-            _buildTodaySummary(),
+            _buildTodaySummary(selectedDay),
             const SizedBox(height: 24),
             _buildSectionHeader('Hourly forecast'),
             const SizedBox(height: 12),
-            _buildHourlyForecast(),
+            _buildHourlyForecast(hourlyForSelectedDay),
             const SizedBox(height: 24),
             _buildSectionHeader('Daily conditions'),
             const SizedBox(height: 12),
-            _buildDailyConditionsGrid(),
+            _buildDailyConditionsGrid(selectedDay),
             const SizedBox(height: 24),
             _buildSectionHeader('Hourly details'),
             const SizedBox(height: 12),
-            _buildHourlyDetailsChart(),
+            _buildHourlyDetailsChart(hourlyForSelectedDay),
             const SizedBox(height: 24),
           ],
         ),
@@ -59,23 +91,18 @@ class _DetailsPageState extends State<DetailsPage> {
   }
 
   Widget _buildDaySelector() {
-    // Mock data for day chips
-    final List<Map<String, dynamic>> days = [
-      {'day': 'Today', 'temp': '84°/78°', 'icon': Icons.thunderstorm},
-      {'day': 'Thu', 'temp': '86°/80°', 'icon': Icons.cloud},
-      {'day': 'Fri', 'temp': '85°/80°', 'icon': Icons.thunderstorm_outlined},
-      {'day': 'Sat', 'temp': '87°/80°', 'icon': Icons.wb_sunny},
-      {'day': 'Sun', 'temp': '87°/80°', 'icon': Icons.wb_sunny_outlined},
-      {'day': 'Mon', 'temp': '86°/79°', 'icon': Icons.cloud},
-    ];
-
+    final daily = widget.weatherData.daily;
     return SizedBox(
       height: 100,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: days.length,
+        itemCount: daily.length,
         itemBuilder: (context, index) {
+          final dayData = daily[index];
+          final date = DateTime.fromMillisecondsSinceEpoch(dayData.dt * 1000);
+          final dayString = index == 0 ? 'Today' : DateFormat('EEE').format(date);
           bool isSelected = _selectedDayIndex == index;
+
           return GestureDetector(
             onTap: () {
               setState(() {
@@ -84,7 +111,7 @@ class _DetailsPageState extends State<DetailsPage> {
             },
             child: Container(
               width: 80,
-              margin: EdgeInsets.only(left: index == 0 ? 16 : 8, right: index == days.length - 1 ? 16 : 0),
+              margin: EdgeInsets.only(left: index == 0 ? 16 : 8, right: index == daily.length - 1 ? 16 : 0),
               decoration: BoxDecoration(
                 color: isSelected ? Colors.blue.withOpacity(0.3) : const Color(0xFF2D3645),
                 borderRadius: BorderRadius.circular(20),
@@ -93,11 +120,11 @@ class _DetailsPageState extends State<DetailsPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(days[index]['day']),
+                  Text(dayString),
                   const SizedBox(height: 8),
-                  Icon(days[index]['icon'], color: Colors.white),
+                  Icon(getWeatherIcon(dayData.main), color: Colors.white),
                   const SizedBox(height: 8),
-                  Text(days[index]['temp'], style: const TextStyle(fontSize: 12)),
+                  Text('${dayData.maxTemp.round()}°/${dayData.minTemp.round()}°', style: const TextStyle(fontSize: 12)),
                 ],
               ),
             ),
@@ -107,39 +134,42 @@ class _DetailsPageState extends State<DetailsPage> {
     );
   }
 
-  Widget _buildTodaySummary() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.0),
+  Widget _buildTodaySummary(DailyForecast selectedDay) {
+    final date = DateTime.fromMillisecondsSinceEpoch(selectedDay.dt * 1000);
+    final dayString = _selectedDayIndex == 0 ? 'Today' : DateFormat('EEEE').format(date);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Today', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          SizedBox(height: 8),
+          Text(dayString, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
           Row(
             children: [
-              Text('84°/78°', style: TextStyle(fontSize: 48, fontWeight: FontWeight.w300)),
-              SizedBox(width: 16),
-              Icon(Icons.thunderstorm, size: 48, color: Colors.yellow),
+              Text('${selectedDay.maxTemp.round()}°/${selectedDay.minTemp.round()}°', style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w300)),
+              const SizedBox(width: 16),
+              Icon(getWeatherIcon(selectedDay.main), size: 48, color: Colors.yellow),
             ],
           ),
-          SizedBox(height: 4),
-          Text('Heavy thunderstorm', style: TextStyle(fontSize: 18, color: Colors.white70)),
+          const SizedBox(height: 4),
+          Text(selectedDay.main, style: const TextStyle(fontSize: 18, color: Colors.white70)),
         ],
       ),
     );
   }
 
-  Widget _buildHourlyForecast() {
-    // This is similar to the home page's hourly forecast
+  Widget _buildHourlyForecast(List<HourlyForecast> hourly) {
     return SizedBox(
       height: 120,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: 8,
+        itemCount: hourly.length,
         itemBuilder: (context, index) {
+          final item = hourly[index];
           return Container(
             width: 70,
-            margin: EdgeInsets.only(left: index == 0 ? 16 : 8, right: index == 7 ? 16 : 0),
+            margin: EdgeInsets.only(left: index == 0 ? 16 : 8, right: index == hourly.length - 1 ? 16 : 0),
             padding: const EdgeInsets.all(8.0),
             decoration: BoxDecoration(
               color: const Color(0xFF2D3645),
@@ -148,10 +178,10 @@ class _DetailsPageState extends State<DetailsPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Text(index == 0 ? 'Now' : '${10 + index} AM'),
-                const Icon(Icons.thunderstorm_outlined, color: Colors.yellow),
-                const Text('81°'),
-                const Text('50%', style: TextStyle(color: Colors.lightBlueAccent)),
+                Text(DateFormat.j().format(DateTime.fromMillisecondsSinceEpoch(item.dt * 1000))),
+                Icon(getWeatherIcon(item.main), color: Colors.yellow),
+                Text('${item.temp.round()}°'),
+                Text('${item.pop}%', style: const TextStyle(color: Colors.lightBlueAccent)),
               ],
             ),
           );
@@ -160,7 +190,10 @@ class _DetailsPageState extends State<DetailsPage> {
     );
   }
 
-  Widget _buildDailyConditionsGrid() {
+  Widget _buildDailyConditionsGrid(DailyForecast selectedDay) {
+    final isToday = _selectedDayIndex == 0;
+    final current = widget.weatherData.current;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: GridView.count(
@@ -171,10 +204,10 @@ class _DetailsPageState extends State<DetailsPage> {
         crossAxisSpacing: 10,
         childAspectRatio: 1.5,
         children: [
-          _buildConditionCard('Max wind', '7 mph', 'Light · From southwest', Icons.air),
-          _buildConditionCard('Average humidity', '90%', '', Icons.water_drop_outlined),
-          _buildConditionCard('Max UV Index', '3', 'Moderate', Icons.wb_sunny_outlined),
-          _buildConditionCard('Sunrise & sunset', '5:34 AM', 'Sunset: 6:10 PM', Icons.wb_twilight),
+          _buildConditionCard('Max wind', isToday ? '${current.windSpeed.toStringAsFixed(1)} mph' : 'N/A', '', Icons.air),
+          _buildConditionCard('Humidity', isToday ? '${current.humidity}%' : 'N/A', '', Icons.water_drop_outlined),
+          _buildConditionCard('UV Index', isToday ? '${current.uvi}' : 'N/A', isToday ? 'Moderate' : '', Icons.wb_sunny_outlined),
+          _buildConditionCard('Sunrise', DateFormat.jm().format(DateTime.fromMillisecondsSinceEpoch(current.sunrise * 1000)), 'Sunset: ${DateFormat.jm().format(DateTime.fromMillisecondsSinceEpoch(current.sunset * 1000))}', Icons.wb_twilight),
         ],
       ),
     );
@@ -186,36 +219,26 @@ class _DetailsPageState extends State<DetailsPage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(title, style: TextStyle(color: Colors.grey[400])),
-            const SizedBox(height: 8),
-            Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w400)),
-            if (subtitle.isNotEmpty) ...[
+        // Wrap the Column with SingleChildScrollView
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(title, style: TextStyle(color: Colors.grey[400])),
               const SizedBox(height: 8),
-              Text(subtitle, style: TextStyle(color: Colors.grey[400])),
+              Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w400)),
+              if (subtitle.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(subtitle, style: TextStyle(color: Colors.grey[400])),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
-
-  Widget _buildHourlyDetailsChart() {
-    // Mock data for the precipitation chart
-    final List<Map<String, dynamic>> precipData = [
-      {'time': 'Now', 'chance': 50, 'amount': 0.03},
-      {'time': '10 AM', 'chance': 50, 'amount': 0.03},
-      {'time': '11 AM', 'chance': 50, 'amount': 0.03},
-      {'time': '12 PM', 'chance': 50, 'amount': 0.04},
-      {'time': '1 PM', 'chance': 50, 'amount': 0.05},
-      {'time': '2 PM', 'chance': 50, 'amount': 0.06},
-      {'time': '3 PM', 'chance': 50, 'amount': 0.06},
-      {'time': '4 PM', 'chance': 70, 'amount': 0.07},
-    ];
-
+  Widget _buildHourlyDetailsChart(List<HourlyForecast> hourly) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Card(
@@ -229,44 +252,75 @@ class _DetailsPageState extends State<DetailsPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  // Using ChoiceChip for the toggle buttons
-                  ChoiceChip(label: const Text('Precipitation'), selected: true, onSelected: (val){}, selectedColor: Colors.blue.withOpacity(0.4)),
-                  ChoiceChip(label: const Text('Wind'), selected: false, onSelected: (val){}),
-                  ChoiceChip(label: const Text('Humidity'), selected: false, onSelected: (val){}),
+                  ChoiceChip(
+                    label: const Text('Precipitation'),
+                    selected: _selectedDetail == DetailChartType.precipitation,
+                    onSelected: (val) => setState(() => _selectedDetail = DetailChartType.precipitation),
+                    selectedColor: Colors.blue.withOpacity(0.4),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Wind'),
+                    selected: _selectedDetail == DetailChartType.wind,
+                    onSelected: (val) => setState(() => _selectedDetail = DetailChartType.wind),
+                    selectedColor: Colors.blue.withOpacity(0.4),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Humidity'),
+                    selected: _selectedDetail == DetailChartType.humidity,
+                    onSelected: (val) => setState(() => _selectedDetail = DetailChartType.humidity),
+                    selectedColor: Colors.blue.withOpacity(0.4),
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
-              const Text("Today's amount", style: TextStyle(color: Colors.white70)),
-              const Text("0.58 in", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               SizedBox(
                 height: 150,
                 child: ListView.builder(
                     scrollDirection: Axis.horizontal,
-                    itemCount: precipData.length,
+                    itemCount: hourly.length,
                     itemBuilder: (context, index) {
-                      final item = precipData[index];
-                      // Calculate bar height relative to max value (e.g., max is 0.07)
-                      final barHeight = (item['amount'] / 0.08) * 60; // Max bar height of 60
+                      final item = hourly[index];
+                      double value;
+                      double maxValue;
+                      String valueText;
+
+                      switch(_selectedDetail) {
+                        case DetailChartType.precipitation:
+                          value = item.pop.toDouble();
+                          maxValue = 100;
+                          valueText = '${item.pop}%';
+                          break;
+                        case DetailChartType.wind:
+                          value = item.windSpeed;
+                          maxValue = 25; // Assume max for UI scaling
+                          valueText = item.windSpeed.toStringAsFixed(1);
+                          break;
+                        case DetailChartType.humidity:
+                          value = item.humidity.toDouble();
+                          maxValue = 100;
+                          valueText = '${item.humidity}%';
+                          break;
+                      }
+
+                      final barHeight = (value / maxValue) * 80; // Increased max bar height
+
                       return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12.0),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Text(item['amount'].toStringAsFixed(2)),
+                            Text(valueText),
                             const SizedBox(height: 4),
                             Container(
                               width: 12,
-                              height: barHeight,
+                              height: barHeight.clamp(0, 80),
                               decoration: BoxDecoration(
                                 color: Colors.blueAccent,
                                 borderRadius: BorderRadius.circular(6),
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text('${item['chance']}%', style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 12)),
-                            const SizedBox(height: 4),
-                            Text(item['time'], style: const TextStyle(fontSize: 12)),
+                            Text(DateFormat.j().format(DateTime.fromMillisecondsSinceEpoch(item.dt * 1000)), style: const TextStyle(fontSize: 12)),
                           ],
                         ),
                       );

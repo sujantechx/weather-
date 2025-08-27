@@ -1,7 +1,8 @@
 // lib/logic/weather_state.dart
 import 'package:equatable/equatable.dart';
 
-import '../data/models/wwather_model.dart';
+import '../data/remote_data/models/wwather_model.dart';
+
 
 abstract class WeatherState extends Equatable {
   @override
