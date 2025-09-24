@@ -31,7 +31,6 @@ class HomePage extends StatelessWidget {
                   const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: () {
-                      // Allow retrying if the initial fetch failed
                       context.read<WeatherCubit>().refreshWeather();
                     },
                     child: const Text('Try Again'),
@@ -42,7 +41,6 @@ class HomePage extends StatelessWidget {
           }
           if (state is WeatherLoaded) {
             final weather = state.weather;
-            // The buildWeatherUI function is now wrapped in a RefreshIndicator
             return buildWeatherUI(context, weather);
           }
           return const SizedBox.shrink();
@@ -79,8 +77,7 @@ class HomePage extends StatelessWidget {
           const SliverToBoxAdapter(child: SizedBox(height: 10)),
           CurrentConditionsGrid(current: weather.current),
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
-          // --- FIX IS HERE ---
-          // The SunriseSunsetSection (a box widget) is wrapped in a SliverToBoxAdapter.
+
           SliverToBoxAdapter(child: SunriseSunsetSection(current: weather.current)),
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
         ],
@@ -88,7 +85,6 @@ class HomePage extends StatelessWidget {
     );
   }}
 
-// ... (All other widgets in this file like CurrentWeatherSection, etc., remain exactly the same)
 
 // Helper function to map weather conditions to icons
 IconData getWeatherIcon(String mainCondition) {
@@ -110,7 +106,7 @@ IconData getWeatherIcon(String mainCondition) {
 }
 
 
-// MARK: - Updated Widgets to accept real data
+// MARk Updated Widgets to accept real data
 
 class CurrentWeatherSection extends StatelessWidget {
   final CurrentWeather current;
@@ -140,7 +136,6 @@ class CurrentWeatherSection extends StatelessWidget {
               ),
             ],
           ),
-          // ... (Placeholder remains the same)
         ],
       ),
     );
@@ -191,7 +186,6 @@ class HourlyForecastSection extends StatelessWidget {
   }
 }
 
-// ... inside your home.dart file
 
 class DailyForecastSection extends StatelessWidget {
   final WeatherData weatherData; // Add this to receive the full weather data
@@ -221,7 +215,6 @@ class DailyForecastSection extends StatelessWidget {
               ),
             ),
             child: Padding(
-              // ... the rest of your Row UI remains the same
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -252,8 +245,7 @@ class DailyForecastSection extends StatelessWidget {
   }
 }
 
-// In your HomePage's buildWeatherUI method, update the DailyForecastSection call:
-// DailyForecastSection(daily: weather.daily) -> DailyForecastSection(weatherData: weather)
+// DailyForecastSection(daily: weather.daily) DailyForecastSection(weatherData: weather)
 class CurrentConditionsGrid extends StatelessWidget {
   final CurrentWeather current;
   const CurrentConditionsGrid({super.key, required this.current});
@@ -311,7 +303,6 @@ class CurrentConditionsGrid extends StatelessWidget {
   }
 }
 
-// lib/ui/home.dart (or wherever this widget is located)
 
 class SunriseSunsetSection extends StatelessWidget {
   final CurrentWeather current;
@@ -371,7 +362,6 @@ class SunriseSunsetPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // --- Calculate Sun's Progress ---
     final int now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final totalDaylight = sunset - sunrise;
     final elapsedTime = now - sunrise;
@@ -380,7 +370,6 @@ class SunriseSunsetPainter extends CustomPainter {
     // .clamp() ensures the value stays within this range, even before sunrise or after sunset.
     final double progress = (elapsedTime / totalDaylight).clamp(0.0, 1.0);
 
-    // --- Draw the Background Arc ---
     final paint = Paint()
       ..color = Colors.grey[600]!
       ..style = PaintingStyle.stroke

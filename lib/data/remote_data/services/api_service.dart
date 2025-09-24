@@ -7,7 +7,7 @@ class ApiHelper {
   Future<dynamic> getAPI({required String url}) async {
     var uri = Uri.parse(url);
     try {
-      // Note: OpenWeatherMap API key is sent as a query parameter,
+      //  OpenWeatherMap API key is sent as a query parameter,
       // not in the headers, so we don't add headers here.
       var response = await http.get(uri);
       return returnJsonResponse(response);

@@ -23,13 +23,12 @@ class WeatherRepository {
       final currentWeatherData = responses[0];
       final forecastData = responses[1];
 
-      // ** CORRECTED LINE **
+
       // Use the factory constructor from your model to parse and combine the two responses.
       return WeatherData.fromCombinedJson(currentWeatherData, forecastData);
 
     } catch (e) {
-      // Rethrow the exception to be handled by the BLoC/Cubit
-      rethrow;
+        rethrow;
     }
   }
 }
